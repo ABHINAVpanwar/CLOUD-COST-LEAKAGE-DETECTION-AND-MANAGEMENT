@@ -1,0 +1,243 @@
+<div class="layout">
+  <app-sidebar role="ADMIN"></app-sidebar>
+
+  <main class="main">
+    <div class="topbar">
+      <h2>Admin Panel</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='dashboard'" [class.btn-secondary]="activeTab!=='dashboard'" (click)="setActiveTab('dashboard')">Dashboard</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='users'" [class.btn-secondary]="activeTab!=='users'" (click)="setActiveTab('users')">Users</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='audit-logs'" [class.btn-secondary]="activeTab!=='audit-logs'" (click)="setActiveTab('audit-logs')">Audit Logs</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='settings'" [class.btn-secondary]="activeTab!=='settings'" (click)="setActiveTab('settings')">Settings</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='stats'" [class.btn-secondary]="activeTab!=='stats'" (click)="setActiveTab('stats')">Stats</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='support'" [class.btn-secondary]="activeTab!=='support'" (click)="setActiveTab('support')">Support</button>
+        <button class="btn btn-sm" [class.btn-primary]="activeTab==='leakages'" [class.btn-secondary]="activeTab!=='leakages'" (click)="setActiveTab('leakages')">Leakage Reports</button>
+      </div>
+    </div>
+
+    <div class="msg msg-success" *ngIf="successMsg" style="margin-bottom:16px;">{{ successMsg }}</div>
+
+    <!-- Dashboard Tab -->
+    <div *ngIf="activeTab === 'dashboard'">
+      <ng-container *ngIf="dashboardData">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value">{{ dashboardData.totalUsers }}</div><div class="stat-label">Total Users</div></div>
+          <div class="stat-card"><div class="stat-value">{{ dashboardData.totalClients }}</div><div class="stat-label">Clients</div></div>
+          <div class="stat-card"><div class="stat-value">{{ dashboardData.totalEngineers }}</div><div class="stat-label">Engineers</div></div>
+          <div class="stat-card"><div class="stat-value">{{ dashboardData.activeUsers }}</div><div class="stat-label">Active Users</div></div>
+          <div class="stat-card"><div class="stat-value">₹{{ dashboardData.totalEstimatedSavings | number:'1.0-0' }}</div><div class="stat-label">Total Savings</div></div>
+          <div class="stat-card"><div class="stat-value">{{ dashboardData.lockedUsers }}</div><div class="stat-label">Locked Accounts</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Recent Users</span></div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let u of dashboardData.recentUsers">
+                  <td><strong>{{ u.username }}</strong></td>
+                  <td>{{ u.email }}</td>
+                  <td><span class="badge" [class]="getRoleBadgeClass(u.role)">{{ u.role }}</span></td>
+                  <td><span class="badge" [class]="getStatusBadgeClass(u.status)">{{ u.status }}</span></td>
+                  <td>{{ u.createdAt | date:'mediumDate' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </ng-container>
+      <div *ngIf="!dashboardData" class="no-data"><div class="icon"></div>Loading dashboard...</div>
+    </div>
+
+    <!-- Users Tab -->
+    <div *ngIf="activeTab === 'users'">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">User Management</span>
+          <button class="btn btn-primary btn-sm" (click)="openCreateUserModal()">+ Add User</button>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <input type="text" class="form-control" style="max-width:300px;" placeholder="Search by name, email, username..." [(ngModel)]="searchTerm" (keyup.enter)="searchUsers()">
+          <button class="btn btn-secondary btn-sm" (click)="searchUsers()">Search</button>
+          <button class="btn btn-secondary btn-sm" (click)="searchTerm='';page=1;loadUsers()">Clear</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let u of pagedUsers">
+                <td><strong>{{ u.username }}</strong></td>
+                <td>{{ u.fullName }}</td>
+                <td>{{ u.email }}</td>
+                <td><span class="badge" [class]="getRoleBadgeClass(u.role)">{{ u.role }}</span></td>
+                <td><span class="badge" [class]="getStatusBadgeClass(u.status)">{{ u.status }}</span></td>
+                <td>{{ u.lastLogin ? (u.lastLogin | date:'mediumDate') : 'Never' }}</td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" (click)="editUser(u)">Edit</button>
+                  <button class="btn btn-secondary btn-sm" (click)="resetUserPassword(u)">Reset PW</button>
+                  <button class="btn btn-sm"
+                    [class.btn-danger]="u.status==='ACTIVE'"
+                    [class.btn-warning]="u.status==='LOCKED'"
+                    [class.btn-secondary]="u.status==='INACTIVE'"
+                    (click)="toggleUserStatus(u)">
+                    {{ u.status === 'ACTIVE' ? 'Deactivate' : u.status === 'LOCKED' ? 'Unlock' : 'Activate' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;" *ngIf="totalPages > 1">
+          <span>Showing {{ (page-1)*pageSize+1 }}–{{ page*pageSize > users.length ? users.length : page*pageSize }} of {{ users.length }}</span>
+          <button class="btn btn-secondary btn-sm" (click)="page=page-1" [disabled]="page===1">Prev</button>
+          <button *ngFor="let p of pages" class="btn btn-sm" [class.btn-primary]="p===page" [class.btn-secondary]="p!==page" (click)="page=p">{{ p }}</button>
+          <button class="btn btn-secondary btn-sm" (click)="page=page+1" [disabled]="page===totalPages">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Logs Tab -->
+    <div *ngIf="activeTab === 'audit-logs'">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Audit Logs</span>
+          <span class="badge badge-outline">Read-Only — Tamper-Proof</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <input type="text" class="form-control" style="max-width:200px;" placeholder="Filter by username" [(ngModel)]="logFilterUsername">
+          <select class="form-control" style="width:160px;" [(ngModel)]="logFilterDays">
+            <option [value]="1">Last 24 hours</option>
+            <option [value]="7">Last 7 days</option>
+            <option [value]="30">Last 30 days</option>
+            <option [value]="90">Last 90 days</option>
+          </select>
+          <button class="btn btn-primary btn-sm" (click)="loadAuditLogs()">Apply</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let log of auditLogs">
+                <td style="white-space:nowrap;">{{ log.createdAt | date:'medium' }}</td>
+                <td><strong>{{ log.username }}</strong></td>
+                <td><span class="badge" [class]="getActionBadgeClass(log.action)">{{ log.action }}</span></td>
+                <td style="font-size:12px;">{{ log.details }}</td>
+                <td style="font-size:12px;">{{ log.ipAddress }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div *ngIf="activeTab === 'settings'">
+      <div class="card" style="max-width:600px;">
+        <div class="card-header"><span class="card-title">System Settings</span></div>
+        <div class="form-grid-2">
+          <div class="form-group"><label>Max Login Attempts</label><input type="number" class="form-control" [(ngModel)]="settingsForm['login.max.attempts']" placeholder="5"></div>
+        </div>
+        <button class="btn btn-primary" (click)="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Stats Tab -->
+    <div *ngIf="activeTab === 'stats'">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value">{{ stats.totalUsers || 0 }}</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.activeUsers || 0 }}</div><div class="stat-label">Active Users</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.totalLoginsLast30Days || 0 }}</div><div class="stat-label">Logins (30 days)</div></div>
+        <div class="stat-card"><div class="stat-value">{{ stats.totalUploadsLast30Days || 0 }}</div><div class="stat-label">Uploads (30 days)</div></div>
+      </div>
+    </div>
+    <!-- Support Tab -->
+    <div *ngIf="activeTab === 'support'">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Support Tickets (Admin)</span></div>
+        <div *ngIf="supportLoading" class="loading">Loading tickets...</div>
+        <div *ngIf="!supportLoading && supportTickets.length === 0" class="no-data" style="padding:24px;">No support tickets assigned to admin.</div>
+        <div *ngFor="let t of supportTickets" style="border:1px solid #e0e0dc;border-radius:10px;padding:16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <strong>{{ t.subject }}</strong>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span class="badge" [class]="getRoleBadgeClass(t.priority==='HIGH'?'ADMIN':t.priority==='MEDIUM'?'ENGINEER':'CLIENT')">{{ t.priority }}</span>
+              <select class="form-control" style="width:140px;padding:4px 8px;font-size:12px;" [(ngModel)]="t.status" (change)="updateSupportStatus(t)">
+                <option value="OPEN">OPEN</option>
+                <option value="IN_PROGRESS">IN PROGRESS</option>
+                <option value="RESOLVED">RESOLVED</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px;">From: <strong>{{ t.clientName }}</strong> ({{ t.clientUsername }}) &middot; {{ t.createdAt | date:'mediumDate' }}</div>
+          <div style="font-size:13px;color:#444;white-space:pre-wrap;">{{ t.message }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leakages Tab -->
+    <div *ngIf="activeTab === 'leakages'">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Leakage Reports by Client</span></div>
+        <div class="form-group" style="max-width:320px;">
+          <label>Select Client</label>
+          <select class="form-control" [(ngModel)]="selectedLeakageUserId" (change)="loadLeakages()">
+            <option value="">-- Select a client --</option>
+            <option *ngFor="let u of clientUsers" [value]="u.id">{{ u.fullName || u.username }} ({{ u.username }})</option>
+          </select>
+        </div>
+        <div *ngIf="leakagesLoading" class="loading">Loading...</div>
+        <div *ngIf="!leakagesLoading && selectedLeakageUserId && leakageRows.length === 0" class="no-data" style="padding:24px;">No leakages found for this client. They may not have uploaded data yet.</div>
+        <div *ngIf="!leakagesLoading && leakageRows.length > 0">
+          <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+            <div class="stat-card"><div class="stat-value">{{ leakageRows.length }}</div><div class="stat-label">Leakages Detected</div></div>
+            <div class="stat-card"><div class="stat-value">₹{{ leakageTotalWaste | number:'1.0-0' }}</div><div class="stat-label">Total Estimated Waste</div></div>
+            <div class="stat-card"><div class="stat-value">₹{{ leakageTotalWaste | number:'1.0-0' }}</div><div class="stat-label">Potential Savings</div></div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Resource</th><th>Type</th><th>Provider</th><th>CPU %</th><th>Uptime %</th><th>Monthly Cost</th><th>Issue</th><th>Est. Waste</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let l of leakageRows">
+                  <td><strong>{{ l.resourceName }}</strong></td>
+                  <td>{{ l.resourceType }}</td>
+                  <td>{{ l.provider }}</td>
+                  <td>{{ l.cpuUsage }}%</td>
+                  <td>{{ l.uptime }}%</td>
+                  <td>₹{{ l.cost | number:'1.0-0' }}</td>
+                  <td>{{ l.issue }}</td>
+                  <td><strong>₹{{ l.estimatedWastedCost | number:'1.0-0' }}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- User Modal -->
+<div *ngIf="showUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;" (click)="showUserModal=false">
+  <div style="background:white;border-radius:12px;padding:28px;width:100%;max-width:480px;border:1px solid #e0e0dc;" (click)="$event.stopPropagation()">
+    <h3 style="margin-bottom:20px;">{{ editingUser ? 'Edit User' : 'Create New User' }}</h3>
+    <div class="form-grid-2">
+      <div class="form-group"><label>Username</label><input type="text" class="form-control" [(ngModel)]="userForm.username" [disabled]="editingUser !== null"></div>
+      <div class="form-group"><label>Email</label><input type="email" class="form-control" [(ngModel)]="userForm.email" [disabled]="editingUser !== null"></div>
+      <div class="form-group"><label>Full Name</label><input type="text" class="form-control" [(ngModel)]="userForm.fullName"></div>
+      <div class="form-group"><label>Mobile Number</label><input type="text" class="form-control" [(ngModel)]="userForm.mobileNo"></div>
+    </div>
+    <div class="form-group"><label>Role</label>
+      <select class="form-control" [(ngModel)]="userForm.role" [disabled]="isDefaultUser(editingUser)">
+        <option value="CLIENT">Client</option>
+        <option value="ENGINEER">Cloud Engineer</option>
+        <option value="ADMIN">Admin</option>
+      </select>
+      <small *ngIf="isDefaultUser(editingUser)" style="color:#888;margin-top:4px;display:block;">Role cannot be changed for default system accounts.</small>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-secondary" (click)="showUserModal=false">Cancel</button>
+      <button class="btn btn-primary" (click)="saveUser()">Save User</button>
+    </div>
+  </div>
+</div>
